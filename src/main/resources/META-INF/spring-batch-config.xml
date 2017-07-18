@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:oxm="http://www.springframework.org/schema/oxm" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:encryption="http://www.jasypt.org/schema/encryption"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
+		http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-4.2.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.2.xsd
+		http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-3.0.xsd
+		http://www.jasypt.org/schema/encryption http://www.jasypt.org/schema/encryption/jasypt-spring31-encryption-1.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-2.5.xsd"
+	default-lazy-init="true" default-autowire="byName">
+
+	<context:component-scan base-package="com.san.batch" />
+	<context:property-placeholder />
+
+	<batch:job id="stepProcessorJob">
+		<batch:step id="parent" next="initial">
+			<tasklet>
+				<batch:chunk writer="itemWriter" reader="itemReader" commit-interval="1" />
+			</tasklet>
+		</batch:step>
+		<batch:step id="initial" next="stepDecider" parent="parent">
+			<tasklet>
+				<batch:chunk>
+					<listeners>
+						<listener ref="initialProcessor" />
+					</listeners>
+				</batch:chunk>
+			</tasklet>
+		</batch:step>
+		<batch:decision decider="decider" id="stepDecider">
+			<batch:next on="stepOne" to="stepOne" />
+			<batch:next on="stepTwo" to="stepTwo" />
+			<batch:next on="stepThree" to="stepThree" />
+			<batch:next on="END" to="stepEnd" />
+		</batch:decision>
+
+		<batch:step id="stepOne" next="stepDecider" parent="parent">
+			<tasklet>
+				<batch:chunk>
+					<listeners>
+						<listener ref="stepOneProcessor" />
+					</listeners>
+				</batch:chunk>
+			</tasklet>
+		</batch:step>
+
+		<batch:step id="stepTwo" next="stepDecider" parent="parent">
+			<tasklet>
+				<batch:chunk>
+					<listeners>
+						<listener ref="stepTwoProcessor" />
+					</listeners>
+				</batch:chunk>
+			</tasklet>
+		</batch:step>
+
+		<batch:step id="stepThree" next="stepDecider" parent="parent">
+			<tasklet>
+				<batch:chunk>
+					<listeners>
+						<listener ref="stepThreeProcessor" />
+					</listeners>
+				</batch:chunk>
+			</tasklet>
+		</batch:step>
+				
+		<batch:step id="stepEnd" parent="parent">
+			<tasklet>
+				<batch:chunk>
+					<listeners>
+						<listener ref="stepEndProcessor" />
+					</listeners>
+				</batch:chunk>
+			</tasklet>
+		</batch:step>
+	</batch:job>
+
+	<bean id="itemReader" class="com.san.batch.NoOpItemReader" scope="step" />
+	<bean id="itemWriter" class="com.san.batch.NoOpItemWriter" />
+
+	<bean id="initialProcessor" class="com.san.batch.InitialProcessor" />
+	<bean id="stepOneProcessor" class="com.san.batch.StepOneProcessor" />
+	<bean id="stepTwoProcessor" class="com.san.batch.StepTwoProcessor" />
+	<bean id="stepThreeProcessor" class="com.san.batch.StepThreeProcessor" />
+	<bean id="stepEndProcessor" class="com.san.batch.StepEndProcessor" />
+	
+	<bean id="decider" class="com.san.batch.SmartStepDecider">
+		<property name="stepQueue" ref="allSteps"/>
+	</bean>
+
+    <util:list id="allSteps" list-class="java.util.LinkedList" value-type="java.lang.String">
+    	<value>stepOne</value>
+	    <value>stepTwo</value>
+	    <value>stepThree</value>
+     </util:list>
+
+	<bean id="jobRepository" class="org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean">
+		<property name="transactionManager" ref="transactionManager" />
+	</bean>
+
+	<bean id="jobLuncher" class="org.springframework.batch.core.launch.support.SimpleJobLauncher" >
+		<property name="jobRepository" ref="jobRepository" />
+	</bean>
+
+	<bean id="transactionManager" class="org.springframework.batch.support.transaction.ResourcelessTransactionManager" />
+
+</beans>
